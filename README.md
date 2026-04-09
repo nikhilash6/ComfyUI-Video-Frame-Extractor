@@ -55,6 +55,8 @@ Restart ComfyUI after installation.
 
 ## Usage
 
+[![Watch the video](https://img.youtube.com/vi/vsk4-RGSdnA/maxresdefault.jpg)](https://youtu.be/vsk4-RGSdnA)
+
 1. Place a video file in `ComfyUI/input/` or upload one directly via the **Choose Video to Upload** button on the node
 2. Add the **Video Frame Extractor 🎞️** node to your graph *(right-click canvas → Add Node → video)*
 3. Select your video from the dropdown — the timeline populates automatically
