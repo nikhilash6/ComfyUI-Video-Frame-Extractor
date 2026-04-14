@@ -1,0 +1,7 @@
+{
+  "author": "comfyuiattic-989",
+  "title": "Video Frame Extractor",
+  "reference": "https://github.com/comfyuiattic-989/ComfyUI-Video-Frame-Extractor",
+  "category": "Video",
+  "description": "A ComfyUI custom node that brings a DAW-style interactive video timeline directly into the node graph. Upload any video, scrub through it in real time, drag a loop region to define your extraction window, and pipe the resulting frame batch into any downstream node."
+}
