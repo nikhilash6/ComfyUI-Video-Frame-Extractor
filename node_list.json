@@ -1,0 +1,14 @@
+{
+  "name": "ComfyUI-Video-Frame-Extractor",
+  "description": "A ComfyUI custom node that brings a DAW-style interactive video timeline directly into the node graph. Upload any video, scrub through it in real time, drag a loop region to define your extraction window, and pipe the resulting frame batch into any downstream node.",
+  "version": "1.1.1",
+  "author": "comfyuiattic-989",
+  "nodes": [
+    {
+      "name": "Video-Frame-Extractor",
+      "display_name": "Video Frame Extractor 🎞️",
+      "description": "A DAW-style interactive video timeline directly into the node graph. Upload any video, scrub through it in real time, drag a loop region to define your extraction window, and pipe the resulting frame batch into any downstream node."
+    }
+  ],
+  "outputs": ["IMAGE", "STRING", "INT", "FLOAT"]
+}
