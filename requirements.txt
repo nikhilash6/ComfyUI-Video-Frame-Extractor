@@ -1,3 +1,4 @@
 opencv-python>=4.7
 Pillow>=9.0
 numpy>=1.22
+# psutil>=5.9  # optional — enables RAM-aware memory safety limit

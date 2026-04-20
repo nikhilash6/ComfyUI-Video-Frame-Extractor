@@ -12,6 +12,63 @@ import cv2
 # Helper utilities
 # ---------------------------------------------------------------------------
 
+# Safety limits for memory estimation
+DEFAULT_MAX_MEMORY_BYTES = 8 * 1024**3    # hard cap if psutil unavailable
+SYSTEM_RAM_FRACTION_CAP  = 0.75           # never exceed 75% of available RAM
+
+
+def estimate_peak_memory(width: int, height: int,
+                          num_frames: int, custom_num_frames: int) -> int:
+    """
+    Estimate peak RAM in bytes used during frame extraction.
+
+    Breakdown per call to extract_frames:
+      • uint8 staging buffer      N × H × W × 3 × 1
+      • float32 output tensor     N × H × W × 3 × 4
+    Both live in memory simultaneously at peak.
+
+    Plus we keep around:
+      • frames               (float32, N frames)
+      • frames_reversed      (float32, same N — torch.flip allocates new storage)
+      • frames_at_fps        (float32, custom_N frames)
+    """
+    bpp_u8  = width * height * 3          # bytes per frame, uint8
+    bpp_f32 = bpp_u8 * 4                  # bytes per frame, float32
+
+    # Peak during the first extract_frames() call
+    first_call_peak = (num_frames * bpp_u8) + (num_frames * bpp_f32)
+
+    # After first call completes, frames (f32) + frames_reversed (f32) are resident
+    resident_after_first = (num_frames * bpp_f32) * 2
+
+    # Peak during the second extract_frames() call (target-fps)
+    second_call_peak = (
+        resident_after_first
+        + (custom_num_frames * bpp_u8)
+        + (custom_num_frames * bpp_f32)
+    )
+
+    return max(first_call_peak, second_call_peak)
+
+
+def get_memory_limit() -> int:
+    """Return the max allowed peak memory in bytes."""
+    try:
+        import psutil
+        available = psutil.virtual_memory().available
+        return int(available * SYSTEM_RAM_FRACTION_CAP)
+    except Exception:
+        return DEFAULT_MAX_MEMORY_BYTES
+
+
+def format_bytes(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if abs(n) < 1024.0:
+            return f"{n:.1f} {unit}"
+        n /= 1024.0
+    return f"{n:.1f} PB"
+
+
 def get_video_info(video_path: str) -> dict:
     """Return basic metadata for a video file."""
     cap = cv2.VideoCapture(video_path)
@@ -30,6 +87,8 @@ def get_video_info(video_path: str) -> dict:
         "width":        width,
         "height":       height,
         "duration_seconds": total / fps if fps > 0 else 0,
+        "bytes_per_frame_f32": width * height * 3 * 4,
+        "memory_limit_bytes": get_memory_limit(),
     }
 
 
@@ -142,12 +201,13 @@ class VideoFrameExtractor:
             },
         }
 
-    RETURN_TYPES  = ("IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING", "INT", "INT", "FLOAT", "IMAGE")
-    RETURN_NAMES  = ("frames", "frames_reversed", "first_frame", "last_frame",
-                     "filename_prefix", "width", "height", "fps", "frames_at_fps")
+    RETURN_TYPES  = ("IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING", "INT", "INT", "FLOAT", "IMAGE", "FLOAT")
+    RETURN_NAMES  = ("Clipped Frames", "Reversed Clipped Frames", "First Frame", "Last Frame",
+                     "Filename Prefix (no extension)", "Width", "Height", "Original FPS",
+                     "Clipped Frames at Target FPS", "Target FPS")
     FUNCTION      = "extract"
     CATEGORY      = "video"
-    OUTPUT_NODE   = False
+    OUTPUT_NODE   = True
 
     @classmethod
     def IS_CHANGED(cls, video, start_frame, end_frame, num_frames, target_fps):
@@ -180,6 +240,24 @@ class VideoFrameExtractor:
         if num_frames <= 0:
             num_frames = end_frame - start_frame + 1
 
+        # ── Memory safety check ──────────────────────────────────────────
+        clip_duration     = (end_frame - start_frame + 1) / fps if fps > 0 else 0
+        custom_num_frames = max(1, round(clip_duration * target_fps))
+        peak_bytes        = estimate_peak_memory(width, height, num_frames,
+                                                 custom_num_frames)
+        limit_bytes       = get_memory_limit()
+
+        if peak_bytes > limit_bytes:
+            raise RuntimeError(
+                f"Refusing to run: estimated peak memory "
+                f"{format_bytes(peak_bytes)} exceeds the safe limit of "
+                f"{format_bytes(limit_bytes)}.\n\n"
+                f"Clip: {num_frames} frames @ {width}x{height} "
+                f"(+{custom_num_frames} frames at {target_fps:.1f} fps).\n\n"
+                f"Reduce the loop region, shrink the video resolution, or "
+                f"lower target_fps. A shorter clip uses proportionally less RAM."
+            )
+
         # Extract the frame batch
         frames          = extract_frames(video_path, start_frame, end_frame, num_frames)
         frames_reversed = torch.flip(frames, dims=[0])
@@ -192,12 +270,11 @@ class VideoFrameExtractor:
         filename_prefix = os.path.splitext(os.path.basename(video_path))[0]
 
         # Custom FPS batch: resample the loop region to target_fps
-        clip_duration     = (end_frame - start_frame + 1) / fps if fps > 0 else 0
-        custom_num_frames = max(1, round(clip_duration * target_fps))
+        # (custom_num_frames was computed above for the memory check)
         frames_at_fps     = extract_frames(video_path, start_frame, end_frame, custom_num_frames)
 
         return (frames, frames_reversed, first_frame, last_frame,
-                filename_prefix, width, height, fps, frames_at_fps)
+                filename_prefix, width, height, fps, frames_at_fps, float(target_fps))
 
 
 # ─── API routes ──────────────────────────────────────────────────────────────

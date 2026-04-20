@@ -2,6 +2,6 @@
 
 ## Node Controls
 
-![Node Controls](ComfyUI-Video-Frame-Extractor--Node.png)
+![Node Controls](ComfyUI-Video-Frame-Extractor--Node.v1.3.0.png)
 
-![Video Timeline](ComfyUI-Video-Frame-Extractor--002.gif)
+![Video Timeline](ComfyUI-Video-Frame-Extractor.v1.3.0.gif)
