@@ -16,7 +16,7 @@ A ComfyUI custom node that brings a **DAW-style interactive video timeline** dir
 - **Collapsible preview section** — hide the video preview to save canvas space while keeping the timeline accessible
 - **Transport controls** — Play / Pause toggle, frame-step ◀ ▶ buttons that shift the entire loop window one frame at a time
 - **Zoom and pan** — scroll wheel to zoom the timeline, Shift + scroll to pan horizontally
-- **Full outputs** — forward frames, reversed frames, first and last frame as individual images, filename prefix, dimensions, and FPS
+- **Full outputs** — forward frames, reversed frames, first and last frame as individual images, filename prefix, dimensions, FPS, and a custom-FPS resampled frame batch
 
 ---
 
@@ -88,19 +88,21 @@ Restart ComfyUI after installation.
 | `start_frame` | INT         | Loop region start (auto-set by timeline)                            |
 | `end_frame`   | INT         | Loop region end (auto-set by timeline)                              |
 | `num_frames`  | INT         | Frames to extract — **read-only, auto-computed** as end − start + 1 |
+| `target_fps`  | FLOAT       | Target frame rate for the `frames_at_fps` output (default: 24.0)    |
 
 ### Outputs
 
-| Name              | Type   | Description                                                |
-| ----------------- | ------ | ---------------------------------------------------------- |
-| `frames`          | IMAGE  | Batch of extracted frames, forward order `(N, H, W, 3)`    |
-| `frames_reversed` | IMAGE  | Same batch in reverse order — useful for ping-pong effects |
-| `first_frame`     | IMAGE  | Single frame at the loop start `(1, H, W, 3)`              |
-| `last_frame`      | IMAGE  | Single frame at the loop end `(1, H, W, 3)`                |
-| `filename_prefix` | STRING | Video filename without extension, e.g. `my_clip`           |
-| `width`           | INT    | Video width in pixels                                      |
-| `height`          | INT    | Video height in pixels                                     |
-| `fps`             | FLOAT  | Source frame rate                                          |
+| Name              | Type   | Description                                                                                                   |
+| ----------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
+| `frames`          | IMAGE  | Batch of extracted frames, forward order `(N, H, W, 3)`                                                       |
+| `frames_reversed` | IMAGE  | Same batch in reverse order — useful for ping-pong effects                                                    |
+| `first_frame`     | IMAGE  | Single frame at the loop start `(1, H, W, 3)`                                                                 |
+| `last_frame`      | IMAGE  | Single frame at the loop end `(1, H, W, 3)`                                                                   |
+| `filename_prefix` | STRING | Video filename without extension, e.g. `my_clip`                                                              |
+| `width`           | INT    | Video width in pixels                                                                                         |
+| `height`          | INT    | Video height in pixels                                                                                        |
+| `fps`             | FLOAT  | Source frame rate                                                                                             |
+| `frames_at_fps`   | IMAGE  | Frame batch resampled to `target_fps` — frame count is computed automatically from clip duration × target FPS |
 
 ---
 
@@ -167,6 +169,10 @@ Any format supported by your OpenCV build will also work.
 - Halved peak memory during frame extraction by pre-allocating output buffer
 - first_frame / last_frame now sliced from loaded batch instead of re-read from disk
 - Fixed BytesIO buffer in thumbnail endpoint now explicitly closed after use
+
+### 1.2.0
+
+- Added `target_fps` input and `frames_at_fps` output — extracts a frame batch resampled to any target frame rate, independent of `num_frames`
 
 ---
 

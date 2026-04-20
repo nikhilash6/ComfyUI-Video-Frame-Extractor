@@ -135,27 +135,31 @@ class VideoFrameExtractor:
                     "default": 0, "min": 0, "max": 999999, "step": 1,
                     "display": "number",
                 }),
+                "target_fps": ("FLOAT", {
+                    "default": 24.0, "min": 0.1, "max": 240.0, "step": 0.1,
+                    "display": "number",
+                }),
             },
         }
 
-    RETURN_TYPES  = ("IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING", "INT", "INT", "FLOAT")
+    RETURN_TYPES  = ("IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING", "INT", "INT", "FLOAT", "IMAGE")
     RETURN_NAMES  = ("frames", "frames_reversed", "first_frame", "last_frame",
-                     "filename_prefix", "width", "height", "fps")
+                     "filename_prefix", "width", "height", "fps", "frames_at_fps")
     FUNCTION      = "extract"
     CATEGORY      = "video"
     OUTPUT_NODE   = False
 
     @classmethod
-    def IS_CHANGED(cls, video, start_frame, end_frame, num_frames):
+    def IS_CHANGED(cls, video, start_frame, end_frame, num_frames, target_fps):
         video_path = folder_paths.get_annotated_filepath(video)
         if not os.path.exists(video_path):
             return float("nan")
         m = hashlib.md5()
-        m.update(f"{video}{start_frame}{end_frame}{num_frames}".encode())
+        m.update(f"{video}{start_frame}{end_frame}{num_frames}{target_fps}".encode())
         return m.hexdigest()
 
     def extract(self, video: str, start_frame: int, end_frame: int,
-                num_frames: int):
+                num_frames: int, target_fps: float):
         video_path = folder_paths.get_annotated_filepath(video)
         if not os.path.exists(video_path):
             raise FileNotFoundError(f"Video not found: {video_path}")
@@ -187,8 +191,13 @@ class VideoFrameExtractor:
         # Filename prefix — basename without extension
         filename_prefix = os.path.splitext(os.path.basename(video_path))[0]
 
+        # Custom FPS batch: resample the loop region to target_fps
+        clip_duration     = (end_frame - start_frame + 1) / fps if fps > 0 else 0
+        custom_num_frames = max(1, round(clip_duration * target_fps))
+        frames_at_fps     = extract_frames(video_path, start_frame, end_frame, custom_num_frames)
+
         return (frames, frames_reversed, first_frame, last_frame,
-                filename_prefix, width, height, fps)
+                filename_prefix, width, height, fps, frames_at_fps)
 
 
 # ─── API routes ──────────────────────────────────────────────────────────────
